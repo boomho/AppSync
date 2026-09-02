@@ -116,6 +116,21 @@ jobs:
           echo
           echo "=== Theos environment: OK ==="
 
+      - name: Install appinst libzip dependency
+        run: |
+          mkdir -p "$THEOS/lib"
+          mkdir -p "$THEOS/include"
+
+          cp appinst/libzip.a "$THEOS/lib/libzip.a"
+          cp appinst/zip.h "$THEOS/include/zip.h"
+
+          echo "=== libzip ==="
+          ls -lh "$THEOS/lib/libzip.a"
+
+          echo "=== zip.h ==="
+          ls -lh "$THEOS/include/zip.h"
+
+
       # ------------------------------------------------------------
       # Build ONLY appinst
       # ------------------------------------------------------------
@@ -124,7 +139,7 @@ jobs:
         run: |
           make clean || true
           make package
-
+          
       # ------------------------------------------------------------
       # Inspect generated packages
       # ------------------------------------------------------------
