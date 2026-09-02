@@ -27,15 +27,11 @@ jobs:
             libxml2 \
             xz-utils \
             unzip \
-            bzip2
+            bzip2 \
+            libio-compress-lzma-perl
 
       # ------------------------------------------------------------
-      # Install Theos manually instead of install-theos.
-      #
-      # Reason:
-      # install-theos currently installs the latest patched SDK.
-      # We want a fixed iPhoneOS 12.4 SDK for this legacy iphoneos-arm
-      # build.
+      # Install Theos
       # ------------------------------------------------------------
       - name: Install Theos
         run: |
@@ -46,9 +42,33 @@ jobs:
           echo "THEOS=$RUNNER_TEMP/theos" >> "$GITHUB_ENV"
 
       # ------------------------------------------------------------
-      # Install the official Theos iPhoneOS 12.4 patched SDK.
+      # Install Linux iOS toolchain
       #
-      # Sparse checkout avoids downloading all SDKs.
+      # Theos on Linux requires the separate iOS clang/llvm/ld64
+      # toolchain. The official Theos documentation describes this
+      # as a required step for Linux builds.
+      # ------------------------------------------------------------
+      - name: Install Linux iOS toolchain
+        run: |
+          TOOLCHAIN_URL="https://github.com/theos/ios-toolchain/releases/latest/download/ios-toolchain_clang%2Bllvm%2Bld64_latest_linux_x86_64.zip"
+
+          mkdir -p "$THEOS/toolchain"
+
+          curl -fL \
+            "$TOOLCHAIN_URL" \
+            -o "$RUNNER_TEMP/ios-toolchain.zip"
+
+          unzip -q \
+            "$RUNNER_TEMP/ios-toolchain.zip" \
+            -d "$THEOS/toolchain"
+
+          echo "=== Installed toolchain ==="
+          find "$THEOS/toolchain" -maxdepth 4 -type f \
+            \( -name clang -o -name ldid \) \
+            -print
+
+      # ------------------------------------------------------------
+      # Install official iPhoneOS 12.4 SDK
       # ------------------------------------------------------------
       - name: Install official iPhoneOS 12.4 SDK
         run: |
@@ -70,30 +90,54 @@ jobs:
             "$THEOS/sdks/"
 
       # ------------------------------------------------------------
-      # Verify the build environment before compiling.
+      # Verify environment
       # ------------------------------------------------------------
       - name: Verify Theos environment
         run: |
-          echo "=== Theos ==="
+          echo "=== THEOS ==="
           echo "$THEOS"
 
           echo
           echo "=== SDKs ==="
-          ls -lah "$THEOS/sdks"
+          find "$THEOS/sdks" -maxdepth 1 -mindepth 1 -type d -print
 
           test -d "$THEOS/sdks/iPhoneOS12.4.sdk"
 
           echo
           echo "=== Toolchain ==="
-          "$THEOS/toolchain/linux/iphone/bin/clang" \
-            --version
+          find "$THEOS/toolchain" \
+            -maxdepth 5 \
+            -type f \
+            -name clang \
+            -print
+
+          CLANG="$(find "$THEOS/toolchain" \
+            -maxdepth 5 \
+            -type f \
+            -name clang \
+            | head -n 1)"
+
+          test -n "$CLANG"
+          test -x "$CLANG"
 
           echo
-          echo "=== SDK Settings ==="
-          test -f "$THEOS/sdks/iPhoneOS12.4.sdk/SDKSettings.plist"
+          echo "Using clang:"
+          "$CLANG" --version
+
+          echo
+          echo "=== ldid ==="
+          LDID="$(find "$THEOS/toolchain" \
+            -maxdepth 5 \
+            -type f \
+            -name ldid \
+            | head -n 1)"
+
+          if [ -n "$LDID" ]; then
+            "$LDID" -h || true
+          fi
 
       # ------------------------------------------------------------
-      # Build ONLY appinst.
+      # Build ONLY appinst
       # ------------------------------------------------------------
       - name: Build appinst
         working-directory: appinst
@@ -102,11 +146,12 @@ jobs:
           make package
 
       # ------------------------------------------------------------
-      # Inspect generated packages.
+      # Inspect generated packages
       # ------------------------------------------------------------
       - name: Inspect generated DEBs
         run: |
-          echo "=== Generated packages ==="
+          echo "=== Generated DEBs ==="
+
           find appinst \
             -type f \
             -name '*.deb' \
@@ -115,14 +160,20 @@ jobs:
           echo
           echo "=== Package metadata ==="
 
-          for deb in appinst/debs/*.deb; do
+          find appinst \
+            -type f \
+            -name '*.deb' \
+            -print0 |
+          while IFS= read -r -d '' deb; do
             echo
-            echo "--- $deb ---"
-            dpkg-deb -I "$deb" || true
+            echo "----------------------------------------"
+            echo "$deb"
+            echo "----------------------------------------"
+            dpkg-deb -I "$deb"
           done
 
       # ------------------------------------------------------------
-      # Upload the actual official appinst package.
+      # Upload appinst
       # ------------------------------------------------------------
       - name: Upload appinst DEB
         uses: actions/upload-artifact@v4
