@@ -120,6 +120,7 @@ jobs:
       # That would also build zipcmp/zipmerge/ziptorrent,
       # which we do not need.
       # ------------------------------------------------------------
+      
       - name: Build libzip arm64
         run: |
           set -e
@@ -128,6 +129,12 @@ jobs:
           BUILD="$RUNNER_TEMP/libzip-build-arm64"
           SDK="$THEOS/sdks/iPhoneOS12.4.sdk"
           CLANG="$THEOS/toolchain/linux/iphone/bin/clang"
+          AR="$THEOS/toolchain/linux/iphone/bin/llvm-ar"
+          RANLIB="$THEOS/toolchain/linux/iphone/bin/llvm-ranlib"
+
+          test -x "$CLANG"
+          test -x "$AR"
+          test -x "$RANLIB"
 
           rm -rf "$BUILD"
           mkdir -p "$BUILD"
@@ -148,11 +155,16 @@ jobs:
             --disable-zstd \
             --prefix="$BUILD/install" \
             CC="$CLANG" \
+            AR="$AR" \
+            RANLIB="$RANLIB" \
             CFLAGS="-target arm64-apple-ios7.0 -isysroot $SDK -miphoneos-version-min=7.0" \
             LDFLAGS="-target arm64-apple-ios7.0 -isysroot $SDK -miphoneos-version-min=7.0"
 
-          # Build only the library.
-          make -C lib -j"$(nproc)"
+          # Only build the library, not zipcmp/zipmerge/ziptorrent.
+          make -C lib -j"$(nproc)" \
+            CC="$CLANG" \
+            AR="$AR" \
+            RANLIB="$RANLIB"
 
           test -f "$SRC/lib/.libs/libzip.a"
 
@@ -166,6 +178,10 @@ jobs:
           ls -lh "$BUILD/install/lib/libzip.a"
           file "$BUILD/install/lib/libzip.a"
 
+          echo "=== libzip architectures ==="
+          "$THEOS/toolchain/linux/iphone/bin/llvm-lipo" \
+            -info "$BUILD/install/lib/libzip.a" || true
+            
       # ------------------------------------------------------------
       # 9. Install libzip into Theos
       # ------------------------------------------------------------
@@ -190,7 +206,7 @@ jobs:
         working-directory: appinst
         run: |
           make clean || true
-          make package
+          make package ARCHS=arm64
 
       # ------------------------------------------------------------
       # 11. Inspect generated packages
