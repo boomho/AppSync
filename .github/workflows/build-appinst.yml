@@ -1,0 +1,65 @@
+name: Build appinst
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout AppSync
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            fakeroot \
+            rsync \
+            curl \
+            perl \
+            zip \
+            git \
+            libxml2-utils \
+            xz-utils \
+            unzip
+
+      - name: Install Theos
+        env:
+          THEOS: ${{ github.workspace }}/theos
+          CI: 1
+        run: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+
+      - name: Show build environment
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          echo "THEOS=$THEOS"
+          "$THEOS/bin/bootstrap.sh" || true
+          "$THEOS/bin/logos.pl" --help >/dev/null 2>&1 || true
+          ls -la "$THEOS"
+          ls -la "$THEOS/sdks" | head
+
+      - name: Build appinst
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        working-directory: appinst
+        run: |
+          make package GO_EASY_ON_ME=1
+
+      - name: Show generated packages
+        run: |
+          find . -type f \
+            \( -name '*.deb' -o -name '*.ipa' \) \
+            -print
+
+      - name: Upload appinst DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: appinst-2.1.1-iphoneos-arm
+          path: |
+            appinst/packages/*.deb
+          if-no-files-found: error
