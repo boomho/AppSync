@@ -148,7 +148,6 @@ jobs:
           echo "=== Installed libzip ==="
           ls -lh "$THEOS/lib/libzip.a"
           file "$THEOS/lib/libzip.a"
-```
 
 
       # ------------------------------------------------------------
