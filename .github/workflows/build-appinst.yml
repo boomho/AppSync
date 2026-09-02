@@ -50,22 +50,22 @@ jobs:
       # ------------------------------------------------------------
       - name: Install Linux iOS toolchain
         run: |
-          TOOLCHAIN_URL="https://github.com/theos/ios-toolchain/releases/latest/download/ios-toolchain_clang%2Bllvm%2Bld64_latest_linux_x86_64.zip"
+          sudo apt-get install -y libtinfo6
 
           mkdir -p "$THEOS/toolchain"
 
           curl -fL \
-            "$TOOLCHAIN_URL" \
-            -o "$RUNNER_TEMP/ios-toolchain.zip"
+            "https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz" \
+            -o "$RUNNER_TEMP/iOSToolchain-x86_64.tar.xz"
 
-          unzip -q \
-            "$RUNNER_TEMP/ios-toolchain.zip" \
-            -d "$THEOS/toolchain"
+          tar -xJf \
+            "$RUNNER_TEMP/iOSToolchain-x86_64.tar.xz" \
+            -C "$THEOS/toolchain"
 
-          echo "=== Installed toolchain ==="
-          find "$THEOS/toolchain" -maxdepth 4 -type f \
-            \( -name clang -o -name ldid \) \
-            -print
+          echo "=== Toolchain directory ==="
+          find "$THEOS/toolchain" -maxdepth 5 -type f -name clang -print
+
+          test -x "$THEOS/toolchain/linux/iphone/bin/clang"
 
       # ------------------------------------------------------------
       # Install official iPhoneOS 12.4 SDK
