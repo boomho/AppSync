@@ -54,19 +54,20 @@ jobs:
 
           mkdir -p "$THEOS/toolchain"
 
-          curl -fL \
+          curl -sL \
             "https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz" \
-            -o "$RUNNER_TEMP/iOSToolchain-x86_64.tar.xz"
+            | tar -xJvf - \
+              -C "$THEOS/toolchain/"
 
-          tar -xJf \
-            "$RUNNER_TEMP/iOSToolchain-x86_64.tar.xz" \
-            -C "$THEOS/toolchain"
+          echo
+          echo "=== Toolchain tree ==="
+          find "$THEOS/toolchain" -maxdepth 5 -type f | sort | head -200
 
-          echo "=== Toolchain directory ==="
-          find "$THEOS/toolchain" -maxdepth 5 -type f -name clang -print
-
+          echo
+          echo "=== clang ==="
           test -x "$THEOS/toolchain/linux/iphone/bin/clang"
 
+          "$THEOS/toolchain/linux/iphone/bin/clang" --version
       # ------------------------------------------------------------
       # Install official iPhoneOS 12.4 SDK
       # ------------------------------------------------------------
@@ -98,43 +99,22 @@ jobs:
           echo "$THEOS"
 
           echo
-          echo "=== SDKs ==="
-          find "$THEOS/sdks" -maxdepth 1 -mindepth 1 -type d -print
-
+          echo "=== SDK ==="
           test -d "$THEOS/sdks/iPhoneOS12.4.sdk"
+          echo "iPhoneOS12.4.sdk: OK"
 
           echo
-          echo "=== Toolchain ==="
-          find "$THEOS/toolchain" \
-            -maxdepth 5 \
-            -type f \
-            -name clang \
-            -print
-
-          CLANG="$(find "$THEOS/toolchain" \
-            -maxdepth 5 \
-            -type f \
-            -name clang \
-            | head -n 1)"
-
-          test -n "$CLANG"
-          test -x "$CLANG"
-
-          echo
-          echo "Using clang:"
-          "$CLANG" --version
+          echo "=== clang ==="
+          test -x "$THEOS/toolchain/linux/iphone/bin/clang"
+          "$THEOS/toolchain/linux/iphone/bin/clang" --version
 
           echo
           echo "=== ldid ==="
-          LDID="$(find "$THEOS/toolchain" \
-            -maxdepth 5 \
-            -type f \
-            -name ldid \
-            | head -n 1)"
+          test -x "$THEOS/toolchain/linux/iphone/bin/ldid"
+          "$THEOS/toolchain/linux/iphone/bin/ldid" -h || true
 
-          if [ -n "$LDID" ]; then
-            "$LDID" -h || true
-          fi
+          echo
+          echo "=== Theos environment: OK ==="
 
       # ------------------------------------------------------------
       # Build ONLY appinst
