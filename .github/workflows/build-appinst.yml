@@ -9,13 +9,13 @@ jobs:
 
     steps:
       # ------------------------------------------------------------
-      # 1. Checkout official AppSync repository
+      # 1. Checkout official AppSync
       # ------------------------------------------------------------
       - name: Checkout AppSync
         uses: actions/checkout@v5
 
       # ------------------------------------------------------------
-      # 2. Install Linux build dependencies
+      # 2. Build dependencies
       # ------------------------------------------------------------
       - name: Install build dependencies
         run: |
@@ -37,7 +37,7 @@ jobs:
             file
 
       # ------------------------------------------------------------
-      # 3. Install Theos
+      # 3. Theos
       # ------------------------------------------------------------
       - name: Install Theos
         run: |
@@ -48,7 +48,7 @@ jobs:
           echo "THEOS=$RUNNER_TEMP/theos" >> "$GITHUB_ENV"
 
       # ------------------------------------------------------------
-      # 4. Install official iPhoneOS 12.4 SDK
+      # 4. Official iPhoneOS 12.4 SDK
       # ------------------------------------------------------------
       - name: Install iPhoneOS 12.4 SDK
         run: |
@@ -68,7 +68,7 @@ jobs:
           test -d "$THEOS/sdks/iPhoneOS12.4.sdk"
 
       # ------------------------------------------------------------
-      # 5. Install current official Theos Linux iOS toolchain
+      # 5. Current Theos Linux iOS toolchain
       # ------------------------------------------------------------
       - name: Install iOS toolchain
         run: |
@@ -80,11 +80,8 @@ jobs:
 
           test -x "$THEOS/toolchain/linux/iphone/bin/clang"
 
-          echo "=== clang ==="
-          "$THEOS/toolchain/linux/iphone/bin/clang" --version
-
       # ------------------------------------------------------------
-      # 6. Verify Theos environment
+      # 6. Verify environment
       # ------------------------------------------------------------
       - name: Verify Theos
         run: |
@@ -94,16 +91,13 @@ jobs:
           echo "=== SDK ==="
           ls -ld "$THEOS/sdks/iPhoneOS12.4.sdk"
 
-          echo "=== Toolchain ==="
-          ls -l "$THEOS/toolchain/linux/iphone/bin/clang"
+          echo "=== clang ==="
+          "$THEOS/toolchain/linux/iphone/bin/clang" --version
 
       # ------------------------------------------------------------
       # 7. Download official libzip 0.11.2 source
-      #
-      # Official appinst documentation requires libzip 0.11.2.
-      # We build it ourselves instead of downloading a BigBoss DEB.
       # ------------------------------------------------------------
-      - name: Download libzip 0.11.2 source
+      - name: Download libzip 0.11.2
         run: |
           mkdir -p "$RUNNER_TEMP/libzip"
 
@@ -120,94 +114,18 @@ jobs:
           test -d "$RUNNER_TEMP/libzip/libzip-0.11.2"
 
       # ------------------------------------------------------------
-      # 8. Build libzip.a for armv7
-      # ------------------------------------------------------------
-      - name: Build libzip armv7
-        run: |
-          set -e
-
-          BUILD="$RUNNER_TEMP/libzip-build-armv7"
-          SRC="$RUNNER_TEMP/libzip/libzip-0.11.2"
-          SDK="$THEOS/sdks/iPhoneOS12.4.sdk"
-          CLANG="$THEOS/toolchain/linux/iphone/bin/clang"
-
-          rm -rf "$BUILD"
-          mkdir -p "$BUILD"
-
-          cd "$SRC"
-
-          make distclean >/dev/null 2>&1 || true
-
-          ./configure \
-            --host=arm-apple-darwin \
-            --enable-static \
-            --disable-shared \
-            --disable-fs \
-            --prefix="$BUILD/install" \
-            CC="$CLANG" \
-            CFLAGS="-target armv7-apple-ios5.0 -isysroot $SDK -miphoneos-version-min=5.0" \
-            LDFLAGS="-target armv7-apple-ios5.0 -isysroot $SDK -miphoneos-version-min=5.0"
-
-          make -j"$(nproc)"
-          make install
-
-          test -f "$BUILD/install/lib/libzip.a"
-
-          mkdir -p "$RUNNER_TEMP/libzip-universal/armv7"
-          cp "$BUILD/install/lib/libzip.a" \
-            "$RUNNER_TEMP/libzip-universal/armv7/libzip.a"
-
-          file "$RUNNER_TEMP/libzip-universal/armv7/libzip.a"
-
-      # ------------------------------------------------------------
-      # 9. Build libzip.a for armv7s
-      # ------------------------------------------------------------
-      - name: Build libzip armv7s
-        run: |
-          set -e
-
-          BUILD="$RUNNER_TEMP/libzip-build-armv7s"
-          SRC="$RUNNER_TEMP/libzip/libzip-0.11.2"
-          SDK="$THEOS/sdks/iPhoneOS12.4.sdk"
-          CLANG="$THEOS/toolchain/linux/iphone/bin/clang"
-
-          rm -rf "$BUILD"
-          mkdir -p "$BUILD"
-
-          cd "$SRC"
-
-          make distclean >/dev/null 2>&1 || true
-
-          ./configure \
-            --host=arm-apple-darwin \
-            --enable-static \
-            --disable-shared \
-            --disable-fs \
-            --prefix="$BUILD/install" \
-            CC="$CLANG" \
-            CFLAGS="-target armv7s-apple-ios5.0 -isysroot $SDK -miphoneos-version-min=5.0" \
-            LDFLAGS="-target armv7s-apple-ios5.0 -isysroot $SDK -miphoneos-version-min=5.0"
-
-          make -j"$(nproc)"
-          make install
-
-          test -f "$BUILD/install/lib/libzip.a"
-
-          mkdir -p "$RUNNER_TEMP/libzip-universal/armv7s"
-          cp "$BUILD/install/lib/libzip.a" \
-            "$RUNNER_TEMP/libzip-universal/armv7s/libzip.a"
-
-          file "$RUNNER_TEMP/libzip-universal/armv7s/libzip.a"
-
-      # ------------------------------------------------------------
-      # 10. Build libzip.a for arm64
+      # 8. Build ONLY libzip.a for arm64
+      #
+      # Do NOT run the normal "make".
+      # That would also build zipcmp/zipmerge/ziptorrent,
+      # which we do not need.
       # ------------------------------------------------------------
       - name: Build libzip arm64
         run: |
           set -e
 
-          BUILD="$RUNNER_TEMP/libzip-build-arm64"
           SRC="$RUNNER_TEMP/libzip/libzip-0.11.2"
+          BUILD="$RUNNER_TEMP/libzip-build-arm64"
           SDK="$THEOS/sdks/iPhoneOS12.4.sdk"
           CLANG="$THEOS/toolchain/linux/iphone/bin/clang"
 
@@ -223,49 +141,50 @@ jobs:
             --enable-static \
             --disable-shared \
             --disable-fs \
+            --disable-crypto \
+            --disable-gnupg \
+            --disable-bzip2 \
+            --disable-lzma \
+            --disable-zstd \
             --prefix="$BUILD/install" \
             CC="$CLANG" \
-            CFLAGS="-target arm64-apple-ios5.0 -isysroot $SDK -miphoneos-version-min=5.0" \
-            LDFLAGS="-target arm64-apple-ios5.0 -isysroot $SDK -miphoneos-version-min=5.0"
+            CFLAGS="-target arm64-apple-ios7.0 -isysroot $SDK -miphoneos-version-min=7.0" \
+            LDFLAGS="-target arm64-apple-ios7.0 -isysroot $SDK -miphoneos-version-min=7.0"
 
-          make -j"$(nproc)"
-          make install
+          # Build only the library.
+          make -C lib -j"$(nproc)"
 
-          test -f "$BUILD/install/lib/libzip.a"
+          test -f "$SRC/lib/.libs/libzip.a"
 
-          mkdir -p "$RUNNER_TEMP/libzip-universal/arm64"
-          cp "$BUILD/install/lib/libzip.a" \
-            "$RUNNER_TEMP/libzip-universal/arm64/libzip.a"
+          mkdir -p "$BUILD/install/lib"
 
-          file "$RUNNER_TEMP/libzip-universal/arm64/libzip.a"
+          cp \
+            "$SRC/lib/.libs/libzip.a" \
+            "$BUILD/install/lib/libzip.a"
+
+          echo "=== libzip.a ==="
+          ls -lh "$BUILD/install/lib/libzip.a"
+          file "$BUILD/install/lib/libzip.a"
 
       # ------------------------------------------------------------
-      # 11. Combine libzip architectures
+      # 9. Install libzip into Theos
       # ------------------------------------------------------------
-      - name: Create universal libzip.a
+      - name: Install libzip into Theos
         run: |
           set -e
 
-          LIPO="$THEOS/toolchain/linux/iphone/bin/llvm-lipo"
-
-          test -x "$LIPO"
-
           mkdir -p "$THEOS/lib"
 
-          "$LIPO" -create \
-            "$RUNNER_TEMP/libzip-universal/armv7/libzip.a" \
-            "$RUNNER_TEMP/libzip-universal/armv7s/libzip.a" \
-            "$RUNNER_TEMP/libzip-universal/arm64/libzip.a" \
-            -output "$THEOS/lib/libzip.a"
+          cp \
+            "$RUNNER_TEMP/libzip-build-arm64/install/lib/libzip.a" \
+            "$THEOS/lib/libzip.a"
 
-          echo "=== Universal libzip ==="
+          echo "=== Theos libzip ==="
           ls -lh "$THEOS/lib/libzip.a"
           file "$THEOS/lib/libzip.a"
 
-          "$LIPO" -info "$THEOS/lib/libzip.a"
-
       # ------------------------------------------------------------
-      # 12. Build official appinst
+      # 10. Build official appinst
       # ------------------------------------------------------------
       - name: Build appinst
         working-directory: appinst
@@ -274,7 +193,7 @@ jobs:
           make package
 
       # ------------------------------------------------------------
-      # 13. Show generated packages
+      # 11. Inspect generated packages
       # ------------------------------------------------------------
       - name: Inspect packages
         run: |
@@ -291,7 +210,7 @@ jobs:
           done
 
       # ------------------------------------------------------------
-      # 14. Upload appinst package
+      # 12. Upload
       # ------------------------------------------------------------
       - name: Upload appinst
         uses: actions/upload-artifact@v4
