@@ -1,15 +1,17 @@
-name: Build appinst
+name: Build appinst 2.1.1
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout AppSync
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Install build dependencies
         run: |
@@ -22,44 +24,110 @@ jobs:
             perl \
             zip \
             git \
-            libxml2-utils \
+            libxml2 \
             xz-utils \
-            unzip
+            unzip \
+            bzip2
 
+      # ------------------------------------------------------------
+      # Install Theos manually instead of install-theos.
+      #
+      # Reason:
+      # install-theos currently installs the latest patched SDK.
+      # We want a fixed iPhoneOS 12.4 SDK for this legacy iphoneos-arm
+      # build.
+      # ------------------------------------------------------------
       - name: Install Theos
-        env:
-          THEOS: ${{ github.workspace }}/theos
-          CI: 1
         run: |
-          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+          git clone --recursive --depth 1 \
+            https://github.com/theos/theos.git \
+            "$RUNNER_TEMP/theos"
 
-      - name: Show build environment
-        env:
-          THEOS: ${{ github.workspace }}/theos
+          echo "THEOS=$RUNNER_TEMP/theos" >> "$GITHUB_ENV"
+
+      # ------------------------------------------------------------
+      # Install the official Theos iPhoneOS 12.4 patched SDK.
+      #
+      # Sparse checkout avoids downloading all SDKs.
+      # ------------------------------------------------------------
+      - name: Install official iPhoneOS 12.4 SDK
         run: |
-          echo "THEOS=$THEOS"
-          "$THEOS/bin/bootstrap.sh" || true
-          "$THEOS/bin/logos.pl" --help >/dev/null 2>&1 || true
-          ls -la "$THEOS"
-          ls -la "$THEOS/sdks" | head
+          git clone \
+            --depth 1 \
+            --filter=blob:none \
+            --sparse \
+            https://github.com/theos/sdks.git \
+            "$RUNNER_TEMP/theos-sdks"
 
+          cd "$RUNNER_TEMP/theos-sdks"
+
+          git sparse-checkout set iPhoneOS12.4.sdk
+
+          mkdir -p "$THEOS/sdks"
+
+          cp -a \
+            iPhoneOS12.4.sdk \
+            "$THEOS/sdks/"
+
+      # ------------------------------------------------------------
+      # Verify the build environment before compiling.
+      # ------------------------------------------------------------
+      - name: Verify Theos environment
+        run: |
+          echo "=== Theos ==="
+          echo "$THEOS"
+
+          echo
+          echo "=== SDKs ==="
+          ls -lah "$THEOS/sdks"
+
+          test -d "$THEOS/sdks/iPhoneOS12.4.sdk"
+
+          echo
+          echo "=== Toolchain ==="
+          "$THEOS/toolchain/linux/iphone/bin/clang" \
+            --version
+
+          echo
+          echo "=== SDK Settings ==="
+          test -f "$THEOS/sdks/iPhoneOS12.4.sdk/SDKSettings.plist"
+
+      # ------------------------------------------------------------
+      # Build ONLY appinst.
+      # ------------------------------------------------------------
       - name: Build appinst
-        env:
-          THEOS: ${{ github.workspace }}/theos
         working-directory: appinst
         run: |
-          make package GO_EASY_ON_ME=1
+          make clean || true
+          make package
 
-      - name: Show generated packages
+      # ------------------------------------------------------------
+      # Inspect generated packages.
+      # ------------------------------------------------------------
+      - name: Inspect generated DEBs
         run: |
-          find . -type f \
-            \( -name '*.deb' -o -name '*.ipa' \) \
+          echo "=== Generated packages ==="
+          find appinst \
+            -type f \
+            -name '*.deb' \
             -print
 
+          echo
+          echo "=== Package metadata ==="
+
+          for deb in appinst/debs/*.deb; do
+            echo
+            echo "--- $deb ---"
+            dpkg-deb -I "$deb" || true
+          done
+
+      # ------------------------------------------------------------
+      # Upload the actual official appinst package.
+      # ------------------------------------------------------------
       - name: Upload appinst DEB
         uses: actions/upload-artifact@v4
         with:
           name: appinst-2.1.1-iphoneos-arm
           path: |
-            appinst/packages/*.deb
+            appinst/debs/ai.akemi.appinst_*.deb
           if-no-files-found: error
