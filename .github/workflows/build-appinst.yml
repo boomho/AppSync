@@ -116,7 +116,6 @@ jobs:
           echo
           echo "=== Theos environment: OK ==="
 
-```yaml
       - name: Install appinst libzip dependency
         run: |
           mkdir -p "$THEOS/lib"
