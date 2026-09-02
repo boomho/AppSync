@@ -116,19 +116,40 @@ jobs:
           echo
           echo "=== Theos environment: OK ==="
 
+```yaml
       - name: Install appinst libzip dependency
         run: |
           mkdir -p "$THEOS/lib"
           mkdir -p "$THEOS/include"
 
-          cp appinst/libzip.a "$THEOS/lib/libzip.a"
-          cp appinst/zip.h "$THEOS/include/zip.h"
+          # appinst's official build instructions require
+          # libzip 0.11.2 from BigBoss.
+          curl -fL \
+            "http://apt.thebigboss.org/repofiles/cydia/debs2.0/libzip_0.11.2-1_iphoneos-arm.deb" \
+            -o "$RUNNER_TEMP/libzip.deb"
 
-          echo "=== libzip ==="
+          echo "=== Downloaded libzip ==="
+          ls -lh "$RUNNER_TEMP/libzip.deb"
+          file "$RUNNER_TEMP/libzip.deb"
+
+          # Extract the Debian package without installing it.
+          mkdir -p "$RUNNER_TEMP/libzip"
+          dpkg-deb -x "$RUNNER_TEMP/libzip.deb" "$RUNNER_TEMP/libzip"
+
+          echo "=== libzip contents ==="
+          find "$RUNNER_TEMP/libzip" -name 'libzip.a' -o -name 'zip.h'
+
+          # Copy the static library expected by appinst's Makefile.
+          find "$RUNNER_TEMP/libzip" -name 'libzip.a' \
+            -exec cp {} "$THEOS/lib/libzip.a" \;
+
+          # appinst's source includes zip.h from its own source tree,
+          # so no separate system header installation is required.
+
+          echo "=== Installed libzip ==="
           ls -lh "$THEOS/lib/libzip.a"
-
-          echo "=== zip.h ==="
-          ls -lh "$THEOS/include/zip.h"
+          file "$THEOS/lib/libzip.a"
+```
 
 
       # ------------------------------------------------------------
